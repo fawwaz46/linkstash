@@ -1,5 +1,9 @@
 # LinkStash
 
+**▶ Live demo: https://linkstash-henna.vercel.app**
+_(demo uses ephemeral serverless storage, so links reset periodically — set
+`TURSO_DATABASE_URL` for permanent persistence, see below)_
+
 A full-stack **URL shortener with a real analytics dashboard** — clicks over
 time, top referrers, and device breakdown. No third-party analytics, and the
 charts are hand-rolled SVG (zero chart-library dependencies).

@@ -6,10 +6,18 @@ import { createClient, type Client } from "@libsql/client";
 let client: Client | null = null;
 let ready: Promise<void> | null = null;
 
+function defaultUrl(): string {
+  if (process.env.TURSO_DATABASE_URL) return process.env.TURSO_DATABASE_URL;
+  // On serverless (Vercel) the only writable path is /tmp — good enough for a
+  // live demo, though it's ephemeral. Set TURSO_DATABASE_URL for real persistence.
+  if (process.env.VERCEL) return "file:/tmp/linkstash.db";
+  return "file:linkstash.db";
+}
+
 function db(): Client {
   if (!client) {
     client = createClient({
-      url: process.env.TURSO_DATABASE_URL ?? "file:linkstash.db",
+      url: defaultUrl(),
       authToken: process.env.TURSO_AUTH_TOKEN,
     });
   }
