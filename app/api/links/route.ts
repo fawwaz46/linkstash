@@ -1,4 +1,4 @@
-import { createLink, listLinks, normalizeUrl } from "@/lib/links";
+import { createLink, listLinks, normalizeUrl, SlugTakenError } from "@/lib/links";
 
 export async function GET() {
   return Response.json(await listLinks());
@@ -19,7 +19,10 @@ export async function POST(req: Request) {
   try {
     const link = await createLink(normalized, slug);
     return Response.json(link, { status: 201 });
-  } catch {
-    return Response.json({ error: "That slug is already taken." }, { status: 409 });
+  } catch (err) {
+    if (err instanceof SlugTakenError) {
+      return Response.json({ error: err.message }, { status: 409 });
+    }
+    throw err; // real errors surface as 500 instead of a misleading 409
   }
 }

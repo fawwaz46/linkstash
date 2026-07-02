@@ -15,6 +15,9 @@ export function normalizeUrl(raw: string): string | null {
   try {
     const u = new URL(raw.includes("://") ? raw : `https://${raw}`);
     if (u.protocol !== "http:" && u.protocol !== "https:") return null;
+    // Require a real domain (a dot) or localhost — rejects scheme-like inputs
+    // such as "javascript:alert(1)" that would otherwise parse as a bare host.
+    if (!u.hostname.includes(".") && u.hostname !== "localhost") return null;
     return u.toString();
   } catch {
     return null;
@@ -28,14 +31,32 @@ export interface LinkRow {
   clicks: number;
 }
 
+export class SlugTakenError extends Error {}
+
 export async function createLink(url: string, custom?: string): Promise<LinkRow> {
   const db = await withDb();
-  const slug = custom?.trim() || randomSlug();
-  await db.execute({
-    sql: "INSERT INTO links (slug, url) VALUES (?, ?)",
-    args: [slug, url],
-  });
-  return { slug, url, created_at: new Date().toISOString(), clicks: 0 };
+  const wanted = custom?.trim();
+
+  // For a custom slug, one attempt. For a generated slug, retry on the rare
+  // collision so the user never sees a spurious "slug taken" error.
+  const attempts = wanted ? 1 : 5;
+  for (let i = 0; i < attempts; i++) {
+    const slug = wanted || randomSlug();
+    try {
+      await db.execute({
+        sql: "INSERT INTO links (slug, url) VALUES (?, ?)",
+        args: [slug, url],
+      });
+      return { slug, url, created_at: new Date().toISOString(), clicks: 0 };
+    } catch (err) {
+      const collision =
+        err instanceof Error && /UNIQUE|constraint/i.test(err.message);
+      if (!collision) throw err;
+      if (wanted) throw new SlugTakenError("Slug already taken.");
+      // else: generated-slug collision — loop and try another.
+    }
+  }
+  throw new SlugTakenError("Could not allocate a unique slug, try again.");
 }
 
 export async function listLinks(): Promise<LinkRow[]> {
